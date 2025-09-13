@@ -1,0 +1,57 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: fastapi-pipeline
+  namespace: walid-labidi001-dev
+spec:
+  tasks:
+    - name: git-clone
+      taskSpec:
+        steps:
+          - name: clone
+            image: alpine/git
+            script: |
+              git clone https://github.com/WalidLabidi001/fastapi-openshift-demo /workspace/output
+      workspaces:
+        - name: output
+
+    - name: run-tests
+      runAfter: [git-clone]
+      taskSpec:
+        steps:
+          - name: pytest
+            image: python:3.12
+            workingDir: /workspace/output
+            script: |
+              pip install -r requirements.txt
+              pytest -v || exit 1
+      workspaces:
+        - name: output
+
+    - name: build-image
+      runAfter: [run-tests]
+      taskSpec:
+        steps:
+          - name: build
+            image: quay.io/buildah/stable
+            workingDir: /workspace/output
+            script: |
+              buildah bud -t image-registry.openshift-image-registry.svc:5000/walid-labidi001-dev/fastapi-s2i:latest .
+              buildah push image-registry.openshift-image-registry.svc:5000/walid-labidi001-dev/fastapi-s2i:latest
+            securityContext:
+              privileged: true
+      workspaces:
+        - name: output
+
+    - name: deploy
+      runAfter: [build-image]
+      taskSpec:
+        steps:
+          - name: rollout
+            image: quay.io/openshift/origin-cli:latest
+            script: |
+              oc rollout restart deployment/fastapi-s2i -n walid-labidi001-dev
+      workspaces:
+        - name: output
+  workspaces:
+    - name: output

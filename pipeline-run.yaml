@@ -1,0 +1,12 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: fastapi-pipeline-run-1
+  namespace: walid-labidi001-dev
+spec:
+  pipelineRef:
+    name: fastapi-pipeline
+  workspaces:
+    - name: output
+      emptyDir: {}
+  serviceAccountName: pipeline
